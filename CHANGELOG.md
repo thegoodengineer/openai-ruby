@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.80.0](https://github.com/openai/openai-ruby/compare/v0.79.0...v0.80.0) (2026-08-14)
+
+
+### Features
+
+* **api:** Ultrafast tier, structured MCP and websocket errors, separate websocket events ([#414](https://github.com/openai/openai-ruby/issues/414)) ([c1f3525](https://github.com/openai/openai-ruby/commit/c1f35252bc042445ba419e413b744a2f55c514ce))
+
+
+### Chores
+
+* remove SDK namespace line-length exemption ([#419](https://github.com/openai/openai-ruby/issues/419)) ([a089ee1](https://github.com/openai/openai-ruby/commit/a089ee1788b9399fa0570896dc422ae375b6baf3))
+
 ## [0.79.0](https://github.com/openai/openai-ruby/compare/v0.78.0...v0.79.0) (2026-08-14)
 
 
