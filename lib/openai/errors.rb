@@ -275,7 +275,7 @@ module OpenAI
       # @return [OpenAI::Models::OAuthErrorCode::Variants, nil]
       attr_reader :error_code
 
-      def initialize(status:, body:, headers:)
+      def initialize(status:, body:, headers:, url: URI("https://auth.openai.com/oauth/token"))
         @error_code = OpenAI::Internal::Type::Converter.coerce(
           OpenAI::Models::OAuthErrorCode,
           body&.dig(:error)
@@ -291,7 +291,7 @@ module OpenAI
           end
 
         super(
-          url: URI("https://auth.openai.com/oauth/token"),
+          url: url,
           status: status,
           headers: headers,
           body: body,

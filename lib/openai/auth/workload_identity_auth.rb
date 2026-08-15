@@ -2,24 +2,31 @@
 
 module OpenAI
   module Auth
+    # Coordinates cached workload identity credentials across threads.
+    #
+    # @api private
     class WorkloadIdentityAuth
-      SUBJECT_TOKEN_TYPES = {
-        TokenType::JWT => "urn:ietf:params:oauth:token-type:jwt",
-        TokenType::ID => "urn:ietf:params:oauth:token-type:id_token"
-      }.freeze
-
-      TOKEN_EXCHANGE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:token-exchange"
-      DEFAULT_TOKEN_EXCHANGE_URL = "https://auth.openai.com/oauth/token"
+      SUBJECT_TOKEN_TYPES = TokenExchange::SUBJECT_TOKEN_TYPES
+      TOKEN_EXCHANGE_GRANT_TYPE = TokenExchange::GRANT_TYPE
+      DEFAULT_TOKEN_EXCHANGE_URL = TokenExchange::DEFAULT_URL
       DEFAULT_REFRESH_BUFFER_SECONDS = 1200
 
       def initialize(
         config,
-        organization_id,
-        token_exchange_url: DEFAULT_TOKEN_EXCHANGE_URL
+        _organization_id,
+        token_exchange_url: DEFAULT_TOKEN_EXCHANGE_URL,
+        http_client: nil,
+        sleeper: ->(delay) { sleep(delay) },
+        monotonic_clock: -> { OpenAI::Internal::Util.monotonic_secs }
       )
-        @config = config
-        @organization_id = organization_id
-        @token_exchange_url = URI(token_exchange_url)
+        @refresh_buffer_seconds = config.refresh_buffer_seconds
+        @token_exchange = TokenExchange.build(
+          config,
+          token_exchange_url: token_exchange_url,
+          http_client: http_client,
+          sleeper: sleeper
+        )
+        @monotonic_clock = monotonic_clock
 
         @cached_token = nil
         @cached_token_expires_at_monotonic = nil
@@ -29,44 +36,59 @@ module OpenAI
         @cond_var = ConditionVariable.new
       end
 
+      # @api private
       def get_token
         @mutex.synchronize do
-          @cond_var.wait(@mutex) while @refreshing && token_unusable?
+          if @refreshing
+            return @cached_token unless token_unusable?
 
-          unless token_unusable? || needs_refresh?
+            @cond_var.wait(@mutex) while @refreshing
+            raise token_refresh_error if token_unusable?
+
             return @cached_token
           end
 
-          if @refreshing
-            @cond_var.wait(@mutex) while @refreshing
-            token = @cached_token
-            raise OpenAI::Errors::AuthenticationError, "Token refresh failed" if token_unusable?
-            return token
-          end
+          return @cached_token unless token_unusable? || needs_refresh?
 
           @refreshing = true
         end
 
         perform_refresh
         @mutex.synchronize do
-          raise OpenAI::Errors::AuthenticationError, "Token refresh failed" if token_unusable?
+          raise token_refresh_error if token_unusable?
+
           @cached_token
         end
       end
 
-      def invalidate_token
+      # Invalidate only the credential that was rejected when it is supplied.
+      # This prevents a late 401 from discarding a token refreshed by another
+      # request.
+      #
+      # @api private
+      def invalidate_token(rejected_token = nil)
         @mutex.synchronize do
+          return nil unless rejected_token.nil? || rejected_token == @cached_token
+
           @cached_token = nil
           @cached_token_expires_at_monotonic = nil
           @cached_token_refresh_at_monotonic = nil
         end
+        nil
+      end
+
+      # @api private
+      def inspect
+        state = @mutex.synchronize { [!@cached_token.nil?, @refreshing] }
+        "#<#{self.class.name}:0x#{object_id.to_s(16)} cached=#{state.fetch(0)} " \
+          "refreshing=#{state.fetch(1)}>"
       end
 
       private
 
       def perform_refresh
-        token_data = fetch_token_from_exchange
-        now = OpenAI::Internal::Util.monotonic_secs
+        token_data = @token_exchange.fetch
+        now = @monotonic_clock.call
         expires_in = token_data.fetch(:expires_in)
 
         @mutex.synchronize do
@@ -81,76 +103,6 @@ module OpenAI
         end
       end
 
-      def fetch_token_from_exchange
-        subject_token = @config.provider.get_token
-
-        token_type = @config.provider.token_type
-        subject_token_type = SUBJECT_TOKEN_TYPES.fetch(token_type) do
-          raise ArgumentError,
-                "Unsupported token type: #{token_type.inspect}. " \
-                "Supported types: #{SUBJECT_TOKEN_TYPES.keys.join(', ')}"
-        end
-
-        request = Net::HTTP::Post.new(@token_exchange_url)
-        request["Content-Type"] = "application/json"
-        body = {
-          grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
-          subject_token: subject_token,
-          subject_token_type: subject_token_type,
-          identity_provider_id: @config.identity_provider_id,
-          service_account_id: @config.service_account_id
-        }
-        body[:client_id] = @config.client_id unless @config.client_id.nil?
-        request.body = JSON.generate(body)
-
-        response = Net::HTTP.start(
-          @token_exchange_url.hostname,
-          @token_exchange_url.port,
-          use_ssl: @token_exchange_url.scheme == "https",
-          open_timeout: 5,
-          read_timeout: 5,
-          write_timeout: 5
-        ) do |http|
-          http.request(request)
-        end
-
-        handle_token_response(response)
-      end
-
-      def handle_token_response(response)
-        body = parse_response_body(response)
-
-        case response
-        in Net::HTTPBadRequest | Net::HTTPUnauthorized | Net::HTTPForbidden
-          raise OpenAI::Errors::OAuthError.new(
-            status: response.code.to_i,
-            body: body,
-            headers: response.to_hash
-          )
-        in Net::HTTPSuccess
-          {
-            id: body&.dig(:access_token),
-            expires_in: body&.dig(:expires_in)
-          }
-        else
-          raise OpenAI::Errors::APIError.new(
-            url: @token_exchange_url,
-            status: response.code.to_i,
-            headers: response.to_hash,
-            body: body,
-            message: "Token exchange failed with status #{response.code}"
-          )
-        end
-      end
-
-      def parse_response_body(response)
-        return nil if response.body.nil? || response.body.empty?
-
-        JSON.parse(response.body, symbolize_names: true)
-      rescue JSON::ParserError
-        nil
-      end
-
       def token_unusable?
         @cached_token.nil? || token_expired?
       end
@@ -158,20 +110,32 @@ module OpenAI
       def token_expired?
         return true if @cached_token_expires_at_monotonic.nil?
 
-        OpenAI::Internal::Util.monotonic_secs >= @cached_token_expires_at_monotonic
+        @monotonic_clock.call >= @cached_token_expires_at_monotonic
       end
 
       def needs_refresh?
         return false if @cached_token_refresh_at_monotonic.nil?
 
-        OpenAI::Internal::Util.monotonic_secs >= @cached_token_refresh_at_monotonic
+        @monotonic_clock.call >= @cached_token_refresh_at_monotonic
       end
 
       def refresh_delay_seconds(expires_in)
-        configured_buffer = @config.refresh_buffer_seconds || DEFAULT_REFRESH_BUFFER_SECONDS
-        effective_buffer = [configured_buffer, expires_in / 2].min
+        configured_buffer = @refresh_buffer_seconds || DEFAULT_REFRESH_BUFFER_SECONDS
+        effective_buffer = [configured_buffer, expires_in / 2.0].min
 
         [expires_in - effective_buffer, 0].max
+      end
+
+      def token_refresh_error
+        OpenAI::Errors::AuthenticationError.new(
+          url: @token_exchange.url,
+          status: 401,
+          headers: nil,
+          body: nil,
+          request: nil,
+          response: nil,
+          message: "Token refresh failed"
+        )
       end
     end
   end
