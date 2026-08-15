@@ -191,8 +191,8 @@ module OpenAI
           send_retry_header: send_retry_header
         )
       rescue OpenAI::Errors::AuthenticationError
-        raise unless retry_count.zero? && request_replayable?(request)
         @workload_identity_auth.invalidate_token(token)
+        raise unless retry_count.zero? && request_replayable?(request)
 
         fresh_token = @workload_identity_auth.get_token
         refreshed_headers = request[:headers].merge("authorization" => "Bearer #{fresh_token}")

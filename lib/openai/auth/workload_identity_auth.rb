@@ -38,26 +38,29 @@ module OpenAI
 
       # @api private
       def get_token
-        @mutex.synchronize do
-          if @refreshing
-            return @cached_token unless token_unusable?
+        loop do
+          refresh =
+            @mutex.synchronize do
+              if @refreshing
+                return @cached_token unless token_unusable?
 
-            @cond_var.wait(@mutex) while @refreshing
+                @cond_var.wait(@mutex) while @refreshing
+                false
+              elsif token_unusable? || needs_refresh?
+                @refreshing = true
+              else
+                return @cached_token
+              end
+            end
+
+          next unless refresh
+
+          perform_refresh
+          return @mutex.synchronize do
             raise token_refresh_error if token_unusable?
 
-            return @cached_token
+            @cached_token
           end
-
-          return @cached_token unless token_unusable? || needs_refresh?
-
-          @refreshing = true
-        end
-
-        perform_refresh
-        @mutex.synchronize do
-          raise token_refresh_error if token_unusable?
-
-          @cached_token
         end
       end
 
