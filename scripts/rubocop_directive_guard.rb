@@ -77,7 +77,7 @@ module RuboCopDirectiveGuard
   def rubocop_target_paths(root = ".")
     RuboCop::TargetFinder
       .new(RuboCop::ConfigStore.new)
-      .find([root], :only_recognized_file_types)
+      .find(Array(root), :only_recognized_file_types)
   end
 
   def validate

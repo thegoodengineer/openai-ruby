@@ -4,10 +4,13 @@ require "etc"
 require "pathname"
 require "securerandom"
 require "shellwords"
+require "tempfile"
 
 require "minitest/test_task"
 require "rake/clean"
 require "rubocop/rake_task"
+
+require_relative "scripts/rubyfmt_policy"
 
 tapioca = "sorbet/tapioca"
 examples = "examples"
@@ -70,31 +73,37 @@ Rake::Task[:"lint:rubocop"].enhance([:"lint:rubocop_directives", :"lint:rubyfmt"
 
 norm_lines = %w[tr -- \n \0].shelljoin
 
-ruby_source = lambda do |path|
-  path.end_with?(".rb", ".gemspec") ||
-    %w[Gemfile Rakefile].include?(File.basename(path)) ||
-    (File.file?(path) && File.foreach(path).first.to_s.match?(/\A#!.*\bruby\b/))
+ruby_paths = lambda do
+  inputs = if ENV.key?(FILES_ENV)
+    File.readlines(ENV.fetch(FILES_ENV), chomp: true)
+  else
+    ["."]
+  end
+
+  RubyfmtPolicy.paths(inputs)
 end
 
-ruby_paths = lambda do
-  if ENV.key?(FILES_ENV)
-    File.readlines(ENV.fetch(FILES_ENV), chomp: true).select(&ruby_source)
-  else
-    scripts = Dir["scripts/*"].select(&ruby_source)
-    %w[lib test examples Rakefile Gemfile] + Dir["*.gemspec"] + scripts
+run_rubyfmt = lambda do |mode|
+  paths = ruby_paths.call
+  violations = RubyfmtPolicy.violations(paths)
+  abort(violations.join("\n")) unless violations.empty?
+  unless paths.empty?
+    Tempfile.create("rubyfmt-paths") do |file|
+      file.write(paths.join("\n") + "\n")
+      file.flush
+      sh("./scripts/rubyfmt", mode, "@#{file.path}")
+    end
   end
 end
 
 desc("Check Ruby source formatting")
 multitask(:"lint:rubyfmt") do
-  paths = ruby_paths.call
-  sh("./scripts/rubyfmt", "--check", *paths) unless paths.empty?
+  run_rubyfmt.call("--check")
 end
 
 desc("Format Ruby source with rubyfmt")
 multitask(:"format:rb") do
-  paths = ruby_paths.call
-  sh("./scripts/rubyfmt", "--in-place", *paths) unless paths.empty?
+  run_rubyfmt.call("--in-place")
 end
 
 desc("Format `*.rbi`")
