@@ -1,4 +1,6 @@
 # frozen_string_literal: true
+# rubyfmt: false
+# rubyfmt 0.14.1 emits invalid hash-pattern keys for an `in` predicate here.
 
 require_relative "../../test_helper"
 

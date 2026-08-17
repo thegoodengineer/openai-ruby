@@ -19,8 +19,7 @@ begin
 
   # the `stream` itself is an `https://rubyapi.org/3.3/o/enumerable`
   #   which means that you can work with the stream almost as if it is an array
-  all_choices =
-    stream
+  all_choices = stream
     # calling any of the `enumerable` methods will block until the whole stream is consumed
     #   it will also clean up the stream.
     .select do |completion|
@@ -47,8 +46,7 @@ begin
     temperature: 0.0
   )
 
-  stream_of_choices =
-    stream
+  stream_of_choices = stream
     # calling `#lazy` will return a deferred `https://rubyapi.org/3.3/o/enumerator/lazy`
     .lazy
     # each successive calls to methods that return another `enumerable` will not consume the stream

@@ -4,11 +4,13 @@ require_relative "test_helper"
 
 class NetHTTPClientTimeoutTest < Minitest::Test
   class StubNetHTTP
-    attr_accessor :continue_timeout,
-                  :max_retries,
-                  :open_timeout,
-                  :read_timeout,
-                  :write_timeout
+    attr_accessor(
+      :continue_timeout,
+      :max_retries,
+      :open_timeout,
+      :read_timeout,
+      :write_timeout
+    )
 
     attr_reader :request_count
 
@@ -62,10 +64,12 @@ class NetHTTPClientTimeoutTest < Minitest::Test
   end
 
   private def build_client(connection)
-    Class.new(OpenAI::NetHTTPClient) do
-      define_method(:connect) { |**| connection }
-      private :connect
-    end.new
+    Class
+      .new(OpenAI::NetHTTPClient) do
+        define_method(:connect) { |**| connection }
+        private(:connect)
+      end
+      .new
   end
 
   private def nil_timeout_request

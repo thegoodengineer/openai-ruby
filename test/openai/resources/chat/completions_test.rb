@@ -4,8 +4,7 @@ require_relative "../../test_helper"
 
 class OpenAI::Test::Resources::Chat::CompletionsTest < OpenAI::Test::ResourceTest
   def test_create_required_params
-    response =
-      @openai.chat.completions.create(messages: [{content: "string", role: :developer}], model: :"gpt-5.4")
+    response = @openai.chat.completions.create(messages: [{content: "string", role: :developer}], model: :"gpt-5.4")
 
     assert_pattern do
       response => OpenAI::Chat::ChatCompletion
@@ -13,16 +12,16 @@ class OpenAI::Test::Resources::Chat::CompletionsTest < OpenAI::Test::ResourceTes
 
     assert_pattern do
       response => {
-        id: String,
-        choices: ^(OpenAI::Internal::Type::ArrayOf[OpenAI::Chat::ChatCompletion::Choice]),
-        created: Integer,
-        model: String,
-        object: Symbol,
-        moderation: OpenAI::Chat::ChatCompletion::Moderation | nil,
-        service_tier: OpenAI::Chat::ChatCompletion::ServiceTier | nil,
-        system_fingerprint: String | nil,
-        usage: OpenAI::CompletionUsage | nil
-      }
+          id: String,
+          choices: ^(OpenAI::Internal::Type::ArrayOf[OpenAI::Chat::ChatCompletion::Choice]),
+          created: Integer,
+          model: String,
+          object: Symbol,
+          moderation: OpenAI::Chat::ChatCompletion::Moderation | nil,
+          service_tier: OpenAI::Chat::ChatCompletion::ServiceTier | nil,
+          system_fingerprint: String | nil,
+          usage: OpenAI::CompletionUsage | nil
+        }
     end
   end
 
@@ -35,16 +34,16 @@ class OpenAI::Test::Resources::Chat::CompletionsTest < OpenAI::Test::ResourceTes
 
     assert_pattern do
       response => {
-        id: String,
-        choices: ^(OpenAI::Internal::Type::ArrayOf[OpenAI::Chat::ChatCompletion::Choice]),
-        created: Integer,
-        model: String,
-        object: Symbol,
-        moderation: OpenAI::Chat::ChatCompletion::Moderation | nil,
-        service_tier: OpenAI::Chat::ChatCompletion::ServiceTier | nil,
-        system_fingerprint: String | nil,
-        usage: OpenAI::CompletionUsage | nil
-      }
+          id: String,
+          choices: ^(OpenAI::Internal::Type::ArrayOf[OpenAI::Chat::ChatCompletion::Choice]),
+          created: Integer,
+          model: String,
+          object: Symbol,
+          moderation: OpenAI::Chat::ChatCompletion::Moderation | nil,
+          service_tier: OpenAI::Chat::ChatCompletion::ServiceTier | nil,
+          system_fingerprint: String | nil,
+          usage: OpenAI::CompletionUsage | nil
+        }
     end
   end
 
@@ -57,16 +56,16 @@ class OpenAI::Test::Resources::Chat::CompletionsTest < OpenAI::Test::ResourceTes
 
     assert_pattern do
       response => {
-        id: String,
-        choices: ^(OpenAI::Internal::Type::ArrayOf[OpenAI::Chat::ChatCompletion::Choice]),
-        created: Integer,
-        model: String,
-        object: Symbol,
-        moderation: OpenAI::Chat::ChatCompletion::Moderation | nil,
-        service_tier: OpenAI::Chat::ChatCompletion::ServiceTier | nil,
-        system_fingerprint: String | nil,
-        usage: OpenAI::CompletionUsage | nil
-      }
+          id: String,
+          choices: ^(OpenAI::Internal::Type::ArrayOf[OpenAI::Chat::ChatCompletion::Choice]),
+          created: Integer,
+          model: String,
+          object: Symbol,
+          moderation: OpenAI::Chat::ChatCompletion::Moderation | nil,
+          service_tier: OpenAI::Chat::ChatCompletion::ServiceTier | nil,
+          system_fingerprint: String | nil,
+          usage: OpenAI::CompletionUsage | nil
+        }
     end
   end
 
@@ -86,16 +85,16 @@ class OpenAI::Test::Resources::Chat::CompletionsTest < OpenAI::Test::ResourceTes
 
     assert_pattern do
       row => {
-        id: String,
-        choices: ^(OpenAI::Internal::Type::ArrayOf[OpenAI::Chat::ChatCompletion::Choice]),
-        created: Integer,
-        model: String,
-        object: Symbol,
-        moderation: OpenAI::Chat::ChatCompletion::Moderation | nil,
-        service_tier: OpenAI::Chat::ChatCompletion::ServiceTier | nil,
-        system_fingerprint: String | nil,
-        usage: OpenAI::CompletionUsage | nil
-      }
+          id: String,
+          choices: ^(OpenAI::Internal::Type::ArrayOf[OpenAI::Chat::ChatCompletion::Choice]),
+          created: Integer,
+          model: String,
+          object: Symbol,
+          moderation: OpenAI::Chat::ChatCompletion::Moderation | nil,
+          service_tier: OpenAI::Chat::ChatCompletion::ServiceTier | nil,
+          system_fingerprint: String | nil,
+          usage: OpenAI::CompletionUsage | nil
+        }
     end
   end
 
@@ -108,10 +107,10 @@ class OpenAI::Test::Resources::Chat::CompletionsTest < OpenAI::Test::ResourceTes
 
     assert_pattern do
       response => {
-        id: String,
-        deleted: OpenAI::Internal::Type::Boolean,
-        object: Symbol
-      }
+          id: String,
+          deleted: OpenAI::Internal::Type::Boolean,
+          object: Symbol
+        }
     end
   end
 end

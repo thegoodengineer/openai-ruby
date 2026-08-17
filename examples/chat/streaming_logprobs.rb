@@ -24,7 +24,7 @@ stream.each do |event|
     tokens = event.content
     last = tokens.last
     next unless last
-    alts = last.top_logprobs.map { |t| "#{t.token}=#{format('%.2f', t.logprob)}" }.join(", ")
+    alts = last.top_logprobs.map { |t| "#{t.token}=#{format("%.2f", t.logprob)}" }.join(", ")
     puts("\nlogprobs: [#{alts}]")
   when OpenAI::Streaming::ChatLogprobsContentDoneEvent
     puts("\n--- logprobs collection finished (#{event.content.length} tokens) ---")

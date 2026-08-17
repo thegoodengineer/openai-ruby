@@ -1,4 +1,6 @@
 # frozen_string_literal: true
+# rubyfmt: false
+# rubyfmt 0.14.1 emits invalid Ruby for the guarded pattern in this file.
 
 module OpenAI
   module Resources

@@ -14,7 +14,7 @@ messages = [
   {role: :user, content: "Tell me a short story about a robot. Stop after 2 sentences."}
 ]
 
-puts "First streamed completion:"
+puts("First streamed completion:")
 assistant_text = ""
 
 stream1 = client.chat.completions.stream(
@@ -38,7 +38,7 @@ messages << {role: :assistant, content: assistant_text}
 messages << {role: :user, content: "Continue the story with 2 more sentences while keeping the same style."}
 
 puts
-puts "Second streamed completion (with prior turns included):"
+puts("Second streamed completion (with prior turns included):")
 
 stream2 = client.chat.completions.stream(
   model: "gpt-4o-mini",
@@ -55,4 +55,4 @@ stream2.each do |event|
 end
 
 puts
-puts "Done. The second stream is a new completion that used the prior turns as context."
+puts("Done. The second stream is a new completion that used the prior turns as context.")

@@ -217,12 +217,12 @@ class WorkloadIdentityTest < Minitest::Test
     stub_request(:post, "https://auth.openai.com/oauth/token")
       .with do |request|
         JSON.parse(request.body) == {
-          "grant_type" => "urn:ietf:params:oauth:grant-type:token-exchange",
-          "subject_token" => "k8s-jwt-token",
-          "subject_token_type" => "urn:ietf:params:oauth:token-type:jwt",
-          "identity_provider_id" => "idp-123",
-          "service_account_id" => "sa-456"
-        }
+            "grant_type" => "urn:ietf:params:oauth:grant-type:token-exchange",
+            "subject_token" => "k8s-jwt-token",
+            "subject_token_type" => "urn:ietf:params:oauth:token-type:jwt",
+            "identity_provider_id" => "idp-123",
+            "service_account_id" => "sa-456"
+          }
       end
       .to_return(
         status: 200,

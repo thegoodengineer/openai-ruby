@@ -26,13 +26,12 @@ end
 
 desc("Preview docs; use `PORT=<PORT>` to change the port")
 multitask(:"docs:preview") do
-  sh(*%w[yard server --reload --quiet --bind [::] --port], ENV.fetch("PORT", "8808"))
+  sh(*%w[yard server --reload --quiet --bind \[::\] --port], ENV.fetch("PORT", "8808"))
 end
 
 desc("Run test suites; use `TEST=path/to/test.rb` to run a specific test file")
 multitask(:test) do
-  rb =
-    FileList[ENV.fetch("TEST", "./test/**/*_test.rb")]
+  rb = FileList[ENV.fetch("TEST", "./test/**/*_test.rb")]
     .map { "require_relative(#{_1.dump});" }
     .join
 
@@ -46,7 +45,7 @@ end
 xargs = %W[xargs --no-run-if-empty --null --max-procs=#{Etc.nprocessors} --max-args=300 --]
 ruby_opt = {"RUBYOPT" => [ENV["RUBYOPT"], "--encoding=UTF-8"].compact.join(" ")}
 
-filtered = ->(ext, dirs) do
+filtered = -> (ext, dirs) do
   if ENV.key?(FILES_ENV)
     %w[sed -E -n -e] << "/\\.#{ext}$/p" << "--" << ENV.fetch(FILES_ENV)
   else
@@ -66,13 +65,36 @@ desc("Validate RuboCop suppression directives")
 multitask(:"lint:rubocop_directives") do
   ruby(*%w[scripts/validate-rubocop-directives])
 end
-Rake::Task[:"lint:rubocop"].enhance([:"lint:rubocop_directives"])
+
+Rake::Task[:"lint:rubocop"].enhance([:"lint:rubocop_directives", :"lint:rubyfmt"])
 
 norm_lines = %w[tr -- \n \0].shelljoin
 
-desc("Format `*.rb` (paused until rubyfmt is installed)")
+ruby_source = lambda do |path|
+  path.end_with?(".rb", ".gemspec") ||
+    %w[Gemfile Rakefile].include?(File.basename(path)) ||
+    (File.file?(path) && File.foreach(path).first.to_s.match?(/\A#!.*\bruby\b/))
+end
+
+ruby_paths = lambda do
+  if ENV.key?(FILES_ENV)
+    File.readlines(ENV.fetch(FILES_ENV), chomp: true).select(&ruby_source)
+  else
+    scripts = Dir["scripts/*"].select(&ruby_source)
+    %w[lib test examples Rakefile Gemfile] + Dir["*.gemspec"] + scripts
+  end
+end
+
+desc("Check Ruby source formatting")
+multitask(:"lint:rubyfmt") do
+  paths = ruby_paths.call
+  sh("./scripts/rubyfmt", "--check", *paths) unless paths.empty?
+end
+
+desc("Format Ruby source with rubyfmt")
 multitask(:"format:rb") do
-  puts("Ruby source formatting is paused until the rubyfmt cutover.")
+  paths = ruby_paths.call
+  sh("./scripts/rubyfmt", "--in-place", *paths) unless paths.empty?
 end
 
 desc("Format `*.rbi`")
@@ -161,10 +183,12 @@ multitask("build:gem": pkg) do
   # optimizing for grepping through the gem bundle: many tools honour `.ignore` files, including VSCode
   #
   # both `rbi` and `sig` directories are navigable by their respective tool chains and therefore can be ignored by tools such as `rg`
-  Pathname(ignore_file).write(<<~GLOB)
-    rbi/*
-    sig/*
-  GLOB
+  Pathname(ignore_file).write(
+    <<~GLOB
+      rbi/*
+      sig/*
+    GLOB
+  )
 
   # RubyGems' release-gem action waits for pkg/*.gem after running rake release,
   # so build with RubyGems' normal versioned filename and move the artifact there.

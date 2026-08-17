@@ -40,6 +40,7 @@ module OpenAI
         super()
       end
     end
+
     private_constant :ConnectionConfigurationError
 
     # @api private
@@ -48,15 +49,14 @@ module OpenAI
     #
     # @return [Net::HTTP]
     private def connect(url:)
-      port =
-        case [url.port, url.scheme]
-        in [Integer, _]
-          url.port
-        in [nil, "http" | "ws"]
-          Net::HTTP.http_default_port
-        in [nil, "https" | "wss"]
-          Net::HTTP.https_default_port
-        end
+      port = case [url.port, url.scheme]
+      in [Integer, _]
+        url.port
+      in [nil, "http" | "ws"]
+        Net::HTTP.http_default_port
+      in [nil, "https" | "wss"]
+        Net::HTTP.https_default_port
+      end
 
       Net::HTTP.new(url.host, port).tap do
         _1.use_ssl = %w[https wss].include?(url.scheme)
@@ -134,12 +134,11 @@ module OpenAI
     # @yieldparam [Net::HTTP]
     private def with_pool(url, deadline:, &blk)
       origin = OpenAI::Internal::Util.uri_origin(url)
-      pool =
-        @mutex.synchronize do
-          @pools[origin] ||= ConnectionPool.new(size: @size) do
-            configured_connection(url)
-          end
+      pool = @mutex.synchronize do
+        @pools[origin] ||= ConnectionPool.new(size: @size) do
+          configured_connection(url)
         end
+      end
 
       return pool.with(timeout: remaining_timeout(deadline), &blk) if deadline
 
@@ -149,6 +148,7 @@ module OpenAI
           checked_out = true
           blk.call(connection)
         end
+
       rescue ConnectionPool::TimeoutError
         retry unless checked_out
         raise
@@ -186,6 +186,7 @@ module OpenAI
       rescue StandardError
         nil
       end
+
       raise
     end
 
@@ -196,15 +197,16 @@ module OpenAI
     #
     # @return [void]
     def close
-      pools =
-        @mutex.synchronize do
-          current_pools = @pools
-          @pools = {}
-          current_pools
-        end
+      pools = @mutex.synchronize do
+        current_pools = @pools
+        @pools = {}
+        current_pools
+      end
+
       pools.each_value do |pool|
         pool.shutdown { |connection| connection.finish if connection.started? }
       end
+
       nil
     end
 
@@ -247,10 +249,12 @@ module OpenAI
 
                     calibrate_socket_timeout(conn, deadline)
                   end
+
                   eof = true
                 end
               end
             end
+
           ensure
             begin
               conn.finish if !eof && conn&.started?
@@ -259,6 +263,7 @@ module OpenAI
             end
           end
         end
+
       rescue ConnectionConfigurationError => e
         raise e.original, cause: e.original.cause
       rescue Timeout::Error
@@ -273,6 +278,7 @@ module OpenAI
         finished = true
         loop { enum.next }
       end
+
       OpenAI::HTTPClient::Response.new(
         status: Integer(response.code),
         headers: response.each_header.to_h,

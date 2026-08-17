@@ -18,4 +18,4 @@ end
 puts
 
 # Get all of the text that was streamed with .get_output_text
-puts "Character count: #{stream.get_output_text.length}"
+puts("Character count: #{stream.get_output_text.length}")

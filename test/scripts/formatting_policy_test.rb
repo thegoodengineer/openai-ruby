@@ -29,7 +29,8 @@ class FormattingPolicyTest < Minitest::Test
       Lint/Syntax
       Security/Eval
       Security/IoMethods
-    ].each { assert_includes(enabled, _1) }
+    ]
+      .each { assert_includes(enabled, _1) }
     refute_includes(enabled, "Bundler/OrderedGems")
     refute_includes(enabled, "Gemspec/OrderedDependencies")
     assert_equal("disable", config["AllCops"]["NewCops"])
@@ -42,18 +43,69 @@ class FormattingPolicyTest < Minitest::Test
     end
   end
 
-  def test_ruby_formatter_does_not_rewrite_source_during_transition
+  def test_rubyfmt_is_enforced_and_idempotent
     Dir.mktmpdir do |directory|
-      path = File.join(directory, "example.rb")
+      path = File.join(directory, "example with spaces.rb")
       source = "value={hello: 'world'}\n"
       File.write(path, source)
       paths = File.join(directory, "paths")
       File.write(paths, "#{path}\n")
 
+      _stdout, _stderr, before = Open3.capture3(
+        "bundle",
+        "exec",
+        "rake",
+        "lint:rubyfmt",
+        "FORMAT_FILE=#{paths}",
+        chdir: ROOT
+      )
+      refute(before.success?, "unformatted source should fail the CI formatting check")
+
       stdout, stderr, status = Open3.capture3(
-        "bundle", "exec", "rake", "format:rb", "FORMAT_FILE=#{paths}", chdir: ROOT
+        "bundle",
+        "exec",
+        "rake",
+        "format:rb",
+        "FORMAT_FILE=#{paths}",
+        chdir: ROOT
       )
 
+      assert(status.success?, "#{stdout}\n#{stderr}")
+      formatted = File.read(path)
+      refute_equal(source, formatted)
+      stdout, stderr, status = Open3.capture3(
+        "bundle",
+        "exec",
+        "rake",
+        "lint:rubyfmt",
+        "FORMAT_FILE=#{paths}",
+        chdir: ROOT
+      )
+      assert(status.success?, "#{stdout}\n#{stderr}")
+      stdout, stderr, status = Open3.capture3(
+        "bundle",
+        "exec",
+        "rake",
+        "format:rb",
+        "FORMAT_FILE=#{paths}",
+        chdir: ROOT
+      )
+      assert(status.success?, "#{stdout}\n#{stderr}")
+      assert_equal(formatted, File.read(path))
+    end
+  end
+
+  def test_native_exemption_preserves_patterns_affected_by_upstream_bugs
+    Dir.mktmpdir do |directory|
+      path = File.join(directory, "example.rb")
+      source = "# rubyfmt: false\npredicate = -> { _1 in {a: [String]} }\n"
+      File.write(path, source)
+      stdout, stderr, status = Open3.capture3(
+        "./scripts/rubyfmt",
+        "--in-place",
+        path,
+        chdir: ROOT
+      )
       assert(status.success?, "#{stdout}\n#{stderr}")
       assert_equal(source, File.read(path))
     end

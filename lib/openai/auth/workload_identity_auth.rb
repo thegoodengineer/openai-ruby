@@ -74,6 +74,7 @@ module OpenAI
           @cached_token_expires_at_monotonic = now + expires_in
           @cached_token_refresh_at_monotonic = now + refresh_delay_seconds(expires_in)
         end
+
       ensure
         @mutex.synchronize do
           @refreshing = false
@@ -86,8 +87,10 @@ module OpenAI
 
         token_type = @config.provider.token_type
         subject_token_type = SUBJECT_TOKEN_TYPES.fetch(token_type) do
-          raise ArgumentError,
-                "Unsupported token type: #{token_type.inspect}. Supported types: #{SUBJECT_TOKEN_TYPES.keys.join(', ')}"
+          raise(
+            ArgumentError,
+            "Unsupported token type: #{token_type.inspect}. Supported types: #{SUBJECT_TOKEN_TYPES.keys.join(", ")}"
+          )
         end
 
         request = Net::HTTP::Post.new(@token_exchange_url)
@@ -102,16 +105,17 @@ module OpenAI
         body[:client_id] = @config.client_id unless @config.client_id.nil?
         request.body = JSON.generate(body)
 
-        response = Net::HTTP.start(
-          @token_exchange_url.hostname,
-          @token_exchange_url.port,
-          use_ssl: @token_exchange_url.scheme == "https",
-          open_timeout: 5,
-          read_timeout: 5,
-          write_timeout: 5
-        ) do |http|
-          http.request(request)
-        end
+        response = Net::HTTP
+          .start(
+            @token_exchange_url.hostname,
+            @token_exchange_url.port,
+            use_ssl: @token_exchange_url.scheme == "https",
+            open_timeout: 5,
+            read_timeout: 5,
+            write_timeout: 5
+          ) do |http|
+            http.request(request)
+          end
 
         handle_token_response(response)
       end
@@ -121,10 +125,12 @@ module OpenAI
 
         case response
         in Net::HTTPBadRequest | Net::HTTPUnauthorized | Net::HTTPForbidden
-          raise OpenAI::Errors::OAuthError.new(
-            status: response.code.to_i,
-            body: body,
-            headers: response.to_hash
+          raise(
+            OpenAI::Errors::OAuthError.new(
+              status: response.code.to_i,
+              body: body,
+              headers: response.to_hash
+            )
           )
         in Net::HTTPSuccess
           {
@@ -132,12 +138,14 @@ module OpenAI
             expires_in: body&.dig(:expires_in)
           }
         else
-          raise OpenAI::Errors::APIError.new(
-            url: @token_exchange_url,
-            status: response.code.to_i,
-            headers: response.to_hash,
-            body: body,
-            message: "Token exchange failed with status #{response.code}"
+          raise(
+            OpenAI::Errors::APIError.new(
+              url: @token_exchange_url,
+              status: response.code.to_i,
+              headers: response.to_hash,
+              body: body,
+              message: "Token exchange failed with status #{response.code}"
+            )
           )
         end
       end

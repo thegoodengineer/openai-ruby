@@ -16,4 +16,5 @@ stream = client.chat.completions.stream(
 stream.text.each do |text|
   print(text)
 end
+
 puts

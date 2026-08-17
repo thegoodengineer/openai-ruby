@@ -81,7 +81,11 @@ $ bundle exec rake test
 
 ## Linting and formatting
 
-This repository uses [rubocop](https://github.com/rubocop/rubocop) for correctness and security checks. Ruby source formatting is temporarily paused while we switch to rubyfmt. [syntax_tree](https://github.com/ruby-syntax-tree/syntax_tree) continues to format `*.rbi` and `*.rbs` files.
+[rubyfmt](https://github.com/fables-tales/rubyfmt) owns Ruby source layout. The `scripts/rubyfmt` launcher uses version 0.14.1 and downloads a checksum-verified release into your user cache when needed. To use an existing installation, set `RUBYFMT` to an executable of that exact version.
+
+[rubocop](https://github.com/rubocop/rubocop) remains responsible for correctness and security checks. The existing CI lint task also checks rubyfmt output. [syntax_tree](https://github.com/ruby-syntax-tree/syntax_tree) continues to format `*.rbi` and `*.rbs` files.
+
+Two files temporarily use rubyfmt's native `# rubyfmt: false` header: `lib/openai/resources/responses.rb` (a guarded pattern is rewritten into invalid Ruby) and `test/openai/internal/type/base_model_test.rb` (an `in` predicate receives invalid hash-pattern keys). Recheck these upstream bugs when upgrading rubyfmt and remove the exemptions once both files round-trip safely.
 
 There are two separate type checkers supported by this library: [sorbet](https://github.com/sorbet/sorbet) and [steep](https://github.com/soutaro/steep) are used for verifying `*.rbi` and `*.rbs` files respectively.
 
