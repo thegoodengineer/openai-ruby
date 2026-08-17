@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
+require "json"
 require "minitest/autorun"
 require "open3"
 require "rubocop"
 require "tmpdir"
-
-require_relative "../../scripts/rubyfmt_policy"
 
 class FormattingPolicyTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
@@ -114,14 +113,27 @@ class FormattingPolicyTest < Minitest::Test
   end
 
   def test_rubyfmt_covers_the_same_sources_as_rubocop_except_rbi
-    Dir.chdir(ROOT) do
-      paths = RubyfmtPolicy.paths
-      assert_equal(RuboCopDirectiveGuard.rubocop_target_paths.reject { _1.end_with?(".rbi") }, paths)
-      assert_includes(paths.map { File.basename(_1) }, "Steepfile")
-      assert_equal([File.join(ROOT, "Steepfile")], RubyfmtPolicy.paths(["Steepfile"]))
-      assert_empty(RubyfmtPolicy.paths([]))
-      assert_empty(RubyfmtPolicy.violations(RubyfmtPolicy::EXEMPTIONS))
-    end
+    # RuboCop changes directory while loading config. Keep discovery outside
+    # the parallel test process so it cannot race another test's chdir block.
+    source = <<~RUBY
+      require "json"
+      require_relative "scripts/rubyfmt_policy"
+      puts JSON.generate({
+        paths: RubyfmtPolicy.paths,
+        expected: RuboCopDirectiveGuard.rubocop_target_paths.reject { _1.end_with?(".rbi") },
+        steepfile: RubyfmtPolicy.paths(["Steepfile"]),
+        empty: RubyfmtPolicy.paths([]),
+        exemptions: RubyfmtPolicy.violations(RubyfmtPolicy::EXEMPTIONS)
+      })
+    RUBY
+    stdout, stderr, status = Open3.capture3("bundle", "exec", "ruby", "-e", source, chdir: ROOT)
+    assert(status.success?, "#{stdout}\n#{stderr}")
+    result = JSON.parse(stdout)
+    assert_equal(result.fetch("expected"), result.fetch("paths"))
+    assert_includes(result.fetch("paths").map { File.basename(_1) }, "Steepfile")
+    assert_equal([File.join(ROOT, "Steepfile")], result.fetch("steepfile"))
+    assert_empty(result.fetch("empty"))
+    assert_empty(result.fetch("exemptions"))
   end
 
   def test_lint_rejects_unapproved_native_exemptions
